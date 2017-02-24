@@ -1,0 +1,23 @@
+<game>
+    <path>./The Highway v1.0.bin</path>
+    <name>The Highway</name>
+    <desc>
+        The Highway is simple race car game, where you must travel the farthest distance without hitting another car.
+	
+		Push [START] button to launch the game, then push the directional cross to move your car left or right.
+		Collect gold coins to activate options :
+		- Brake [BUTTON A]: Slow the frame rate (1 coins).
+		- Horn [BUTTON B]: frees your lane for 5 seconds (5 coins).
+		- Wings [BUTTON C]: allows to fly over the highway for 10 seconds (10 coins).
+
+		The game is over when you hit another car.
+
+		Good luck...        
+     </desc>
+    <image>~/.emulationstation/downloaded_images/genesis/The Highway v1.0-image.jpg</image>
+    <releasedate>20170301T000000</releasedate>
+    <publisher>darken33.net</publisher>
+    <genre>Sports</genre>
+    <developer>Philippe Bousquet</developer>
+    <players>1</players>
+</game>
