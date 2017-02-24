@@ -35,8 +35,11 @@ typedef struct {
 	u16 status;
 	u16 blink_title;
 	u16 palette[64];
+	u32 best_score;
 	char str_score[64];
-	char str_coins[10];
+	char str_coins[40];
+	char str_fscore[40];
+	char str_bestsc[40];
 } game_data;
 
 // Data for a standard sprite (coins, cars, ...)
@@ -83,6 +86,7 @@ const u16 	TIMER_ACTIVE_CARS	= 1; // Timer to activate a car
 const u16 	TIMER_ADD_CARS		= 2; // Timer to add a new car
 const u16 	TIMER_FLYING		= 3; // Timer of flying duration
 const u16 	TIMER_HORN			= 4; // Timer of horn effect duration
+const u16 	TIMER_MUSIC			= 5; // Timer of horn effect duration
 
 // Duration 
 const u32	TIME_SPEED_UP 		= 1 * SUBTICKPERSECOND;        // 1s
@@ -90,6 +94,7 @@ const u32	TIME_ACTIVE_CARS	= 1 / 100 * SUBTICKPERSECOND;  // 100ms
 const u32	TIME_ADD_CARS 		= 15 * SUBTICKPERSECOND;       // 15s
 const u32	TIME_FLYING 		= 10 * SUBTICKPERSECOND;       // 10s
 const u32	TIME_HORN 			= 5 * SUBTICKPERSECOND;        // 5s
+const u32	TIME_MUSIC 			= 5 * SUBTICKPERSECOND;        // 5s
 
 const u16 	TITLE_BLINK_FREQ	= 40;	
 const u16   SCREEN_FADE_RATE	= 30;   
@@ -134,9 +139,6 @@ const u16	COLUMN_NUMBER		= 5;
 /**********************************************************************/
 /** DATAS                                                            **/
 /**********************************************************************/
-// Best Score 
-u32 best_score;
-
 // Game
 game_data game;
 
@@ -283,6 +285,8 @@ void clearScreen() {
 	VDP_fadeOut(0, (4 * 16) - 1, SCREEN_FADE_RATE, FALSE);
 	VDP_init();
     VDP_setScreenWidth320();
+	VDP_setTextPlan(PLAN_B);	
+	VDP_clearTextArea(0, 0, 24, 80);
     SPR_init(80, 16 * (32 + 16 + 8), 16 * (32 + 16 + 8));
     SYS_enableInts();
     VDP_waitVSync();
@@ -296,12 +300,14 @@ void initTitle() {
     VDP_fadeIn(0, (4 * 16) - 1, title_image.palette->data, SCREEN_FADE_RATE, FALSE);
     VDP_setPalette(PAL3, palette_grey);
 	VDP_setTextPalette(PAL3);	
-	VDP_setTextPlan(PLAN_B);
     VDP_waitVSync();
 } 
 // Show title
 void showTitle() {
-	if (best_score > 0) VDP_drawText(game.str_score, 0, 0);
+	if (game.best_score > 0) {
+		sprintf(game.str_bestsc, "%lu", game.best_score);
+		VDP_drawText(game.str_bestsc, 0, 0);
+	}
 	VDP_drawText(GAME_VERSION, 0, 27);
 	// Blink the text
 	if (game.blink_title > TITLE_BLINK_FREQ/2) {
@@ -316,15 +322,16 @@ void showTitle() {
 	}
 }  
 
-// Show title
+// Show score
 void showScore() {
 	// Blink the text
+	VDP_drawText(game.str_score, 10, 10);
+	VDP_drawText(game.str_coins, 10, 11);
+	VDP_drawText(game.str_fscore, 10, 12);
 	if (game.blink_title > TITLE_BLINK_FREQ/2) {
-		VDP_drawText(game.str_score, 10, 12);
-		VDP_drawText(game.str_coins, 10, 14);
+		VDP_drawText(game.str_bestsc, 10, 14);
 	}
 	else {
-		VDP_clearTextLine(12);
 		VDP_clearTextLine(14);
 	}
 	game.blink_title++;
@@ -379,7 +386,7 @@ void playGame() {
 	while (i < MAX_CARS) {
 		if (cars[i].active == TRUE) {
 			if (player.flying == FALSE && testCollision(i) == TRUE) {
-				SND_startPlayPCM_XGM(SFX_CRS, 1, SOUND_PCM_CH1);
+				XGM_startPlayPCM(SFX_CRS, 1, SOUND_PCM_CH2);
 				SPR_setPosition(explosion.sprite, explosion.position.x, explosion.position.y);
 				game.status = STATUS_SCORE;
 				break;
@@ -394,12 +401,15 @@ void playGame() {
 	// Update and display cars 
 	i = 0;
 	while (i < MAX_CARS) {
+		// Play motor
+		XGM_startPlayPCM(SFX_MTR, 1, SOUND_PCM_CH1);
+		
 		if (cars[i].active == TRUE) {
 			SPR_setPosition(cars[i].sprite, cars[i].position.x, cars[i].position.y);
 			cars[i].position.y += (player.speed - CAR_SPEED);
 			// Unactive car
 			if (cars[i].position.y > 240) {
-				SND_startPlayPCM_XGM(SFX_HRN, 1, SOUND_PCM_CH1);
+				XGM_startPlayPCM(SFX_HRN, 1, SOUND_PCM_CH2);
 				unactiveCar(i);
 				player.score+=CAR_SCORE;
 				// Active Coin bonus
@@ -434,7 +444,7 @@ void playGame() {
 		coin.position.y += player.speed;
 		// Unactive coin
 		if (testCoinCollision() == TRUE) {
-			SND_startPlayPCM_XGM(SFX_CSH, 1, SOUND_PCM_CH1);
+			XGM_startPlayPCM(SFX_CSH, 2, SOUND_PCM_CH2);
 			player.coins++;
 			coin.active=FALSE;
 			coin.position.x = 0;
@@ -542,19 +552,22 @@ void startGame() {
 	startTimer(TIMER_SPEED_UP);
 	startTimer(TIMER_ACTIVE_CARS);
 	startTimer(TIMER_ADD_CARS);
-	SND_startPlay_XGM(motor_sfx);	
+	startTimer(TIMER_MUSIC);
+	
 	// Game Loop
     while (game.status == STATUS_IN_GAME) {
 		playGame();
 	}
-	player.score+=player.coins * COIN_SCORE;
 	sprintf(game.str_score, "YOUR SCORE : %lu", player.score);
-	if (player.score > best_score) {
-		sprintf(game.str_coins, "!!! NEW BEST SCORE !!!");
-		best_score = player.score;
+	sprintf(game.str_coins, "           + %d coins", player.coins);
+	player.score+=player.coins * COIN_SCORE;
+	sprintf(game.str_fscore, "           = %lu", player.score);
+	if (player.score > game.best_score) {
+		sprintf(game.str_bestsc, "!!! NEW BEST SCORE !!!");
+		game.best_score = player.score;
 	}
 	else {
-		sprintf(game.str_coins, "BEST SCORE : %lu", best_score);
+		sprintf(game.str_bestsc, "BEST SCORE : %lu", game.best_score);
 	}
     waitMs(2500);
 	// Retrun to title
@@ -571,20 +584,20 @@ void myJoyHandler( u16 joy, u16 changed, u16 state) {
 		if (game.status == STATUS_TITLE) {
 			// BUTTON START Pressed
 			if (state & BUTTON_START) {
-				SND_startPlayPCM_XGM(SFX_BTN, 1, SOUND_PCM_CH1);
+				XGM_startPlayPCM(SFX_BTN, 3, SOUND_PCM_CH4);
 				game.status = STATUS_START_GAME;
 			}
 		}
 		else if (game.status == STATUS_IN_GAME) {
 			// BUTTON A Pressed : BRAKE
 			if (state & BUTTON_A && player.coins >= COIN_BRAKE) {
-				SND_startPlayPCM_XGM(SFX_BRK, 1, SOUND_PCM_CH1);
+				XGM_startPlayPCM(SFX_BRK, 4, SOUND_PCM_CH3);
 				player.coins -= COIN_BRAKE;
 				player.speed = MIN_SPEED;
 			}
 			// BUTTON B Pressed : HORN
 			if (state & BUTTON_B  && player.coins >= COIN_HORN) {
-				SND_startPlayPCM_XGM(SFX_HN2, 1, SOUND_PCM_CH1);
+				XGM_startPlayPCM(SFX_HN2, 4, SOUND_PCM_CH3);
 				player.coins -= COIN_HORN;
 				player.horn_effect=TRUE;
 				player.horn_col = (player.position.x - PLAYER_MIN_X) / ((PLAYER_MAX_X+16 - PLAYER_MIN_X) / COLUMN_NUMBER);
@@ -599,7 +612,7 @@ void myJoyHandler( u16 joy, u16 changed, u16 state) {
 			}
 			// BUTTON C Pressed : PLANE
 			if (state & BUTTON_C  && player.coins >= COIN_PLANE) {
-				SND_startPlayPCM_XGM(SFX_TOF, 1, SOUND_PCM_CH1);
+				XGM_startPlayPCM(SFX_TOF, 4, SOUND_PCM_CH3);
 				SPR_setAnim(player.sprite, 1);
 				player.coins -= COIN_PLANE;
 				player.flying = TRUE;
@@ -612,9 +625,12 @@ void myJoyHandler( u16 joy, u16 changed, u16 state) {
 				|| (state & BUTTON_A)
 				|| (state & BUTTON_B)
 				|| (state & BUTTON_C)) {
-				SND_startPlayPCM_XGM(SFX_BTN, 1, SOUND_PCM_CH1);
-				sprintf(game.str_score, "%lu", best_score);
+				XGM_startPlayPCM(SFX_BTN, 3, SOUND_PCM_CH4);
 				clearScreen();
+				VDP_clearTextLine(10);
+				VDP_clearTextLine(11);
+				VDP_clearTextLine(12);
+				VDP_clearTextLine(14);
 				initTitle();
 				game.status = STATUS_TITLE;
 			}
@@ -628,7 +644,7 @@ void myJoyHandler( u16 joy, u16 changed, u16 state) {
 int main() {
 	// Initialize VDP & SPR
     SYS_disableInts();
-    best_score = 0;
+    game.best_score = 0;
     VDP_init();
     VDP_setScreenWidth320();
     SPR_init(80, 16 * (32 + 16 + 8), 16 * (32 + 16 + 8));
@@ -638,14 +654,14 @@ int main() {
     VDP_setPaletteColors(0, (u16*) palette_black, 64);
 
 	// Load sounds
-    SND_setPCM_XGM(SFX_BRK, brake_sfx, sizeof(brake_sfx));
-    SND_setPCM_XGM(SFX_BTN, button_sfx, sizeof(button_sfx));
-    SND_setPCM_XGM(SFX_CSH, cash_sfx, sizeof(cash_sfx));
-    SND_setPCM_XGM(SFX_CRS, crash_sfx, sizeof(crash_sfx));
-    SND_setPCM_XGM(SFX_HRN, horn_sfx, sizeof(horn_sfx));
-    SND_setPCM_XGM(SFX_HN2, horn2_sfx, sizeof(horn2_sfx));
-    SND_setPCM_XGM(SFX_MTR, motor_sfx, sizeof(motor_sfx));
-    SND_setPCM_XGM(SFX_TOF, takeoff_sfx, sizeof(takeoff_sfx));
+    XGM_setPCM(SFX_BRK, brake_sfx, sizeof(brake_sfx));
+    XGM_setPCM(SFX_BTN, button_sfx, sizeof(button_sfx));
+    XGM_setPCM(SFX_CSH, cash_sfx, sizeof(cash_sfx));
+    XGM_setPCM(SFX_CRS, crash_sfx, sizeof(crash_sfx));
+    XGM_setPCM(SFX_HRN, horn_sfx, sizeof(horn_sfx));
+    XGM_setPCM(SFX_HN2, horn2_sfx, sizeof(horn2_sfx));
+    XGM_setPCM(SFX_MTR, motor_sfx, sizeof(motor_sfx));
+    XGM_setPCM(SFX_TOF, takeoff_sfx, sizeof(takeoff_sfx));
 	
     // JOY initialization
 	JOY_init();
