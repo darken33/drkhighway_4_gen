@@ -35,6 +35,14 @@ The game is over when you hit another car.
 
 Good luck...
 
+How to scrap the game ?
+-----------------------
+Copy the file scrap/The Highway v1.0-image.jpg file to the 
+/home/pi/.emulationstation/downloaded_images/megadrive/ directory.
+
+Then edit the file /home/pi/.emulationstation/gamelists/megadrive/gamelist.xml
+and add the content of the scrap/The Highway v1.0.scrap file. 
+
 Technologies
 ------------
 The Hyghway is a game for the Genesis (Megadrive) machine developed with 
