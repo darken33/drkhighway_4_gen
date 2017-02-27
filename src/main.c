@@ -16,18 +16,6 @@
  */
 
 /**********************************************************************/
-/** SOUND TRACKS DEFINITION                                          **/ 
-/**********************************************************************/
-#define SFX_BTN 64
-#define SFX_BRK 65
-#define SFX_CSH 66
-#define SFX_CRS 67
-#define SFX_HRN 68
-#define SFX_HN2 69
-#define SFX_MTR 70
-#define SFX_TOF 71
-
-/**********************************************************************/
 /** DATA TYPES DEFINITION                                            **/ 
 /**********************************************************************/
 // Data for the game control
@@ -58,6 +46,7 @@ typedef struct {
 	u16 coins;
 	fix16 speed;
 	u16 flying;
+	u16 landing;
 	u16 horn_effect;
 	u16 horn_col;
 } player_data;
@@ -72,13 +61,14 @@ typedef struct {
 /** CONSTANTS                                                        **/
 /**********************************************************************/
 // Game Version
-const char*	GAME_VERSION 		= "v1.0 (Alpha) - 2017";
+const char*	GAME_VERSION 		= "v1.0 (Beta) - 2017";
 
 // Game Status
 const u16  	STATUS_TITLE 		= 1; // Title 
 const u16 	STATUS_START_GAME 	= 2; // Starting the game
 const u16 	STATUS_IN_GAME 		= 3; // Game pending
-const u16 	STATUS_SCORE 		= 4; // Game pending
+const u16 	STATUS_END_GAME		= 4; // End game
+const u16 	STATUS_SCORE 		= 5; // Score screen
 
 // Timers
 const u16 	TIMER_SPEED_UP		= 0; // Increase player speed
@@ -93,6 +83,7 @@ const u32	TIME_SPEED_UP 		= 1 * SUBTICKPERSECOND;        // 1s
 const u32	TIME_ACTIVE_CARS	= 1 / 100 * SUBTICKPERSECOND;  // 100ms
 const u32	TIME_ADD_CARS 		= 15 * SUBTICKPERSECOND;       // 15s
 const u32	TIME_FLYING 		= 10 * SUBTICKPERSECOND;       // 10s
+const u32	TIME_LANDING 		= 9 * SUBTICKPERSECOND;       // 9s
 const u32	TIME_HORN 			= 5 * SUBTICKPERSECOND;        // 5s
 const u32	TIME_MUSIC 			= 5 * SUBTICKPERSECOND;        // 5s
 
@@ -369,9 +360,16 @@ void playGame() {
 			player.position.x += 2;
 		}
 	}
+
+	// The player still flying 
+	if (player.flying == TRUE && getTimer(TIMER_FLYING, FALSE) >= TIME_LANDING && player.landing == FALSE) {
+		player.landing = TRUE;
+		SPR_setAnim(player.sprite, 2);
+	}
 		
 	// The player still flying 
 	if (player.flying == TRUE && getTimer(TIMER_FLYING, FALSE) >= TIME_FLYING) {
+		player.landing = FALSE;
 		player.flying = FALSE;
 		SPR_setAnim(player.sprite, 0);
 	}
@@ -386,9 +384,9 @@ void playGame() {
 	while (i < MAX_CARS) {
 		if (cars[i].active == TRUE) {
 			if (player.flying == FALSE && testCollision(i) == TRUE) {
-				XGM_startPlayPCM(SFX_CRS, 1, SOUND_PCM_CH2);
+				SND_startPlay_4PCM(crash_sfx, sizeof(crash_sfx), SOUND_PCM_CH1, FALSE); 	
 				SPR_setPosition(explosion.sprite, explosion.position.x, explosion.position.y);
-				game.status = STATUS_SCORE;
+				game.status = STATUS_END_GAME;
 				break;
 			}
 		}		
@@ -402,14 +400,14 @@ void playGame() {
 	i = 0;
 	while (i < MAX_CARS) {
 		// Play motor
-		XGM_startPlayPCM(SFX_MTR, 1, SOUND_PCM_CH1);
+		//XGM_startPlayPCM(SFX_MTR, 1, SOUND_PCM_CH1);
 		
 		if (cars[i].active == TRUE) {
 			SPR_setPosition(cars[i].sprite, cars[i].position.x, cars[i].position.y);
 			cars[i].position.y += (player.speed - CAR_SPEED);
 			// Unactive car
 			if (cars[i].position.y > 240) {
-				XGM_startPlayPCM(SFX_HRN, 1, SOUND_PCM_CH2);
+				SND_startPlay_4PCM(horn_sfx, sizeof(horn_sfx), SOUND_PCM_CH2, FALSE); 	
 				unactiveCar(i);
 				player.score+=CAR_SCORE;
 				// Active Coin bonus
@@ -444,7 +442,7 @@ void playGame() {
 		coin.position.y += player.speed;
 		// Unactive coin
 		if (testCoinCollision() == TRUE) {
-			XGM_startPlayPCM(SFX_CSH, 2, SOUND_PCM_CH2);
+			SND_startPlay_4PCM(cash_sfx, sizeof(cash_sfx), SOUND_PCM_CH3, FALSE); 	
 			player.coins++;
 			coin.active=FALSE;
 			coin.position.x = 0;
@@ -513,6 +511,9 @@ void startGame() {
 	player.position.x = (PLAYER_MIN_X + PLAYER_MAX_X) / 2;
 	player.position.y = PLAYER_Y;
 	player.sprite = SPR_addSprite(&player_sprite, 0, 0, TILE_ATTR(PAL1, TRUE, FALSE, FALSE)); 
+	player.flying = FALSE;
+	player.landing = FALSE;
+	player.horn_effect = FALSE;
 	SPR_setAnim(player.sprite, 0);
 	
 	// Cars initiailisation
@@ -552,12 +553,14 @@ void startGame() {
 	startTimer(TIMER_SPEED_UP);
 	startTimer(TIMER_ACTIVE_CARS);
 	startTimer(TIMER_ADD_CARS);
-	startTimer(TIMER_MUSIC);
+	SND_startPlay_4PCM(motor_sfx, sizeof(motor_sfx), SOUND_PCM_CH1, TRUE); 	
 	
 	// Game Loop
     while (game.status == STATUS_IN_GAME) {
 		playGame();
 	}
+	SND_stopPlay_4PCM(SOUND_PCM_CH1); 	
+
 	sprintf(game.str_score, "YOUR SCORE : %lu", player.score);
 	sprintf(game.str_coins, "           + %d coins", player.coins);
 	player.score+=player.coins * COIN_SCORE;
@@ -570,9 +573,10 @@ void startGame() {
 		sprintf(game.str_bestsc, "BEST SCORE : %lu", game.best_score);
 	}
     waitMs(2500);
-	// Retrun to title
+	// Show the score
 	clearScreen();
 	initTitle();
+	game.status = STATUS_SCORE;
 } 
 
 /**********************************************************************/
@@ -584,20 +588,20 @@ void myJoyHandler( u16 joy, u16 changed, u16 state) {
 		if (game.status == STATUS_TITLE) {
 			// BUTTON START Pressed
 			if (state & BUTTON_START) {
-				XGM_startPlayPCM(SFX_BTN, 3, SOUND_PCM_CH4);
+				SND_startPlay_4PCM(horn2_sfx, sizeof(horn2_sfx), SOUND_PCM_CH1, FALSE); 	
 				game.status = STATUS_START_GAME;
 			}
 		}
 		else if (game.status == STATUS_IN_GAME) {
 			// BUTTON A Pressed : BRAKE
 			if (state & BUTTON_A && player.coins >= COIN_BRAKE) {
-				XGM_startPlayPCM(SFX_BRK, 4, SOUND_PCM_CH3);
+				SND_startPlay_4PCM(brake_sfx, sizeof(brake_sfx), SOUND_PCM_CH4, FALSE); 	
 				player.coins -= COIN_BRAKE;
 				player.speed = MIN_SPEED;
 			}
 			// BUTTON B Pressed : HORN
 			if (state & BUTTON_B  && player.coins >= COIN_HORN) {
-				XGM_startPlayPCM(SFX_HN2, 4, SOUND_PCM_CH3);
+				SND_startPlay_4PCM(horn2_sfx, sizeof(horn2_sfx), SOUND_PCM_CH4, FALSE); 	
 				player.coins -= COIN_HORN;
 				player.horn_effect=TRUE;
 				player.horn_col = (player.position.x - PLAYER_MIN_X) / ((PLAYER_MAX_X+16 - PLAYER_MIN_X) / COLUMN_NUMBER);
@@ -612,7 +616,7 @@ void myJoyHandler( u16 joy, u16 changed, u16 state) {
 			}
 			// BUTTON C Pressed : PLANE
 			if (state & BUTTON_C  && player.coins >= COIN_PLANE) {
-				XGM_startPlayPCM(SFX_TOF, 4, SOUND_PCM_CH3);
+				SND_startPlay_4PCM(plane_sfx, sizeof(plane_sfx), SOUND_PCM_CH4, FALSE); 	
 				SPR_setAnim(player.sprite, 1);
 				player.coins -= COIN_PLANE;
 				player.flying = TRUE;
@@ -625,7 +629,7 @@ void myJoyHandler( u16 joy, u16 changed, u16 state) {
 				|| (state & BUTTON_A)
 				|| (state & BUTTON_B)
 				|| (state & BUTTON_C)) {
-				XGM_startPlayPCM(SFX_BTN, 3, SOUND_PCM_CH4);
+				SND_startPlay_4PCM(cash_sfx, sizeof(cash_sfx), SOUND_PCM_CH1, FALSE); 	
 				clearScreen();
 				VDP_clearTextLine(10);
 				VDP_clearTextLine(11);
@@ -653,16 +657,6 @@ int main() {
     // Set palette to Black
     VDP_setPaletteColors(0, (u16*) palette_black, 64);
 
-	// Load sounds
-    XGM_setPCM(SFX_BRK, brake_sfx, sizeof(brake_sfx));
-    XGM_setPCM(SFX_BTN, button_sfx, sizeof(button_sfx));
-    XGM_setPCM(SFX_CSH, cash_sfx, sizeof(cash_sfx));
-    XGM_setPCM(SFX_CRS, crash_sfx, sizeof(crash_sfx));
-    XGM_setPCM(SFX_HRN, horn_sfx, sizeof(horn_sfx));
-    XGM_setPCM(SFX_HN2, horn2_sfx, sizeof(horn2_sfx));
-    XGM_setPCM(SFX_MTR, motor_sfx, sizeof(motor_sfx));
-    XGM_setPCM(SFX_TOF, takeoff_sfx, sizeof(takeoff_sfx));
-	
     // JOY initialization
 	JOY_init();
 	JOY_setEventHandler( &myJoyHandler );

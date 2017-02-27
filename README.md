@@ -27,7 +27,7 @@ Push [START] button to launch the game, then push the directional cross
 to move your car left or right.
 
 Collect gold coins to activate options :
-  * Brake [BUTTON A]: Slow the frame rate (1 coins).
+  * Brake [BUTTON A]: slows your speed (1 coins).
   * Horn  [BUTTON B]: frees your lane for 5 seconds (5 coins).
   * Wings [BUTTON C]: allows to fly over the highway for 10 seconds (10 coins).
 
