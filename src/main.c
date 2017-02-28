@@ -61,7 +61,7 @@ typedef struct {
 /** CONSTANTS                                                        **/
 /**********************************************************************/
 // Game Version
-const char*	GAME_VERSION 		= "v1.0 (Beta) - 2017";
+const char*	GAME_VERSION 		= "v1.0 - 2017";
 
 // Game Status
 const u16  	STATUS_TITLE 		= 1; // Title 

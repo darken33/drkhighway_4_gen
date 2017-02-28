@@ -1,4 +1,4 @@
-# drkhighway_4_gen
+﻿# drkhighway_4_gen
 "The Highway" port for the Genesis (Megadrive) machine
 --
 The Highway – a simple car race game
@@ -62,3 +62,8 @@ The Highway is a Free Software, so it has the four following freedoms :
   - Freedom 3 : The freedom to improve the program, and release your 
 				improvments (and modified versions in general) to the 
 				public, so that the whole community benefits.
+
+Changelog
+---------
+v1.0 : 
+  - First release of "The Highway" for Genesis (Megadrive)
